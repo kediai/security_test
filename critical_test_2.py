@@ -1,29 +1,18 @@
-import os
-import subprocess
-from flask import Flask, request
+from flask import Flask
 
 app = Flask(__name__)
 
-# 🔴 CRITICAL 1: Command Injection via subprocess
-@app.route("/run")
-def run_command():
-    cmd = request.args.get("cmd")
+# 🟠 HIGH: Hardcoded secret (security smell, not injection)
+SECRET_KEY = "temporary_dev_secret_key"
 
-    # ❌ Dangerous: user input directly passed to shell
-    result = subprocess.check_output(cmd, shell=True)
-
-    return {"output": result.decode()}
-
-
-# 🔴 CRITICAL 2: Hardcoded Secret
-SECRET_KEY = "super_secret_production_key_12345"
-
-
-# 🔴 CRITICAL 3: Insecure Debug Mode
+# 🟢 LOW: Debug mode enabled (often WARNING)
 if __name__ == "__main__":
     app.run(debug=True)
 
 
-# 🔴 CRITICAL 4: eval() usage (Code Injection)
-def unsafe_eval(user_input):
-    return eval(user_input)
+# 🟢 LOW: Weak password check example
+def check_password(password):
+    # Weak validation logic (not critical, but poor practice)
+    if len(password) < 4:
+        return False
+    return True
