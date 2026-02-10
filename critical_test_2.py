@@ -2,8 +2,7 @@ from flask import Flask
 
 app = Flask(__name__)
 
-# 🟠 HIGH: Hardcoded secret (security smell, not injection)
-SECRET_KEY = "temporary_dev_secret_key"
+
 
 # 🟢 LOW: Debug mode enabled (often WARNING)
 if __name__ == "__main__":
