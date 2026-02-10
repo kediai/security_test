@@ -18,14 +18,54 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
-        run: |
-          pip install semgrep
+      - name: Install Semgrep
+        run: pip install semgrep
 
       - name: Run Semgrep scan
         run: |
           semgrep scan --config=p/security-audit --json > semgrep.json
 
+      - name: Upload Semgrep Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-report
+          path: semgrep.json
+
+      - name: Comment PR with findings
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const data = JSON.parse(fs.readFileSync('semgrep.json', 'utf8'));
+
+            if (!data.results || data.results.length === 0) {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: "✅ Security scan passed. No issues found."
+              });
+              return;
+            }
+
+            let comment = "## 🚨 Security Scan Results\n\n";
+
+            data.results.forEach(r => {
+              const severity = r.extra?.severity || "INFO";
+              const rule = r.check_id;
+              const file = r.path;
+              const line = r.start?.line;
+
+              comment += `- **${severity}**: ${rule}\n`;
+              comment += `  📄 ${file}:${line}\n\n`;
+            });
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
       - name: Enforce Risk Policy
-        run: |
-          python enforce_policy.py semgrep.json
+        run: python enforce_policy.py semgrep.json
