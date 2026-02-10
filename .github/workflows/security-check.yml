@@ -1,0 +1,31 @@
+name: Security Policy Enforcement
+
+on:
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install semgrep
+
+      - name: Run Semgrep scan
+        run: |
+          semgrep scan --config=p/security-audit --json > semgrep.json
+
+      - name: Enforce Risk Policy
+        run: |
+          python enforce_policy.py semgrep.json
