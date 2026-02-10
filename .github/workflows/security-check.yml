@@ -15,8 +15,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      # 🔥 IMPORTANT: Checkout the PR code, not develop branch
+      - name: Checkout PR code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -39,16 +42,15 @@ jobs:
       - name: Comment PR with findings
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             const data = JSON.parse(fs.readFileSync('semgrep.json', 'utf8'));
 
-            let commentHeader = "## 🚨 Security Scan Results\n";
-            let commentBody = "";
-            let criticalFound = false;
+            let comment = "## 🚨 Security Scan Results\n\n";
 
             if (!data.results || data.results.length === 0) {
-              commentBody = "✅ No security issues found.\n";
+              comment += "✅ No security issues found.\n";
             } else {
               data.results.forEach(r => {
                 const severity = r.extra?.severity || "INFO";
@@ -56,45 +58,38 @@ jobs:
                 const file = r.path;
                 const line = r.start?.line;
 
-                if (severity === "ERROR") {
-                  criticalFound = true;
-                }
-
-                commentBody += `- **${severity}**: ${rule}\n`;
-                commentBody += `  📄 ${file}:${line}\n\n`;
+                comment += `- **${severity}**: ${rule}\n`;
+                comment += `  📄 ${file}:${line}\n\n`;
               });
             }
 
-            const finalComment = commentHeader + "\n" + commentBody;
-
-            // Remove previous bot comments (avoid spam)
+            // Remove previous comment from bot (avoid duplicates)
             const comments = await github.rest.issues.listComments({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
             });
 
-            const botComment = comments.data.find(c =>
+            const existing = comments.data.find(c =>
               c.user.type === "Bot" &&
               c.body.includes("🚨 Security Scan Results")
             );
 
-            if (botComment) {
+            if (existing) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: finalComment,
+                comment_id: existing.id,
+                body: comment,
               });
             } else {
               await github.rest.issues.createComment({
                 issue_number: context.issue.number,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                body: finalComment,
+                body: comment,
               });
             }
 
       - name: Enforce Risk Policy
         run: python enforce_policy.py semgrep.json
-
