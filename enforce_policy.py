@@ -12,24 +12,39 @@ def classify_risk(severity):
 
 
 def enforce_semgrep_policy(results):
-    blocked = False
+    critical_count = 0
+    high_count = 0
+    low_count = 0
 
     for finding in results:
         severity = finding.get("extra", {}).get("severity", "INFO")
         risk = classify_risk(severity)
-        title = finding.get("check_id")
 
         if risk == "CRITICAL":
-            print(f"🚫 CRITICAL FOUND: {title}")
-            blocked = True
-
+            critical_count += 1
         elif risk == "HIGH":
-            print(f"⚠ HIGH FOUND: {title}")
+            high_count += 1
+        else:
+            low_count += 1
 
-        elif risk == "LOW":
-            print(f"🟢 LOW: {title}")
+    print("\n🔎 Security Summary")
+    print(f"🔴 Critical: {critical_count}")
+    print(f"🟠 High: {high_count}")
+    print(f"🟢 Low: {low_count}")
 
-    return not blocked
+    # 🔴 CRITICAL → Block
+    if critical_count > 0:
+        print("\n❌ PR blocked due to CRITICAL vulnerabilities.")
+        return 1
+
+    # 🟠 HIGH → Allow but require approval
+    if high_count > 0:
+        print("\n⚠ HIGH vulnerabilities detected. Approval required.")
+        return 0
+
+    # 🟢 LOW → Allow
+    print("\n✅ Only LOW issues detected. PR allowed.")
+    return 0
 
 
 if __name__ == "__main__":
@@ -42,11 +57,5 @@ if __name__ == "__main__":
 
     results = data.get("results", [])
 
-    allowed = enforce_semgrep_policy(results)
-
-    if not allowed:
-        print("\n❌ Merge blocked due to CRITICAL vulnerabilities.")
-        sys.exit(1)
-    else:
-        print("\n✅ Security policy passed.")
-        sys.exit(0)
+    exit_code = enforce_semgrep_policy(results)
+    sys.exit(exit_code)
