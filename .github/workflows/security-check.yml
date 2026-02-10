@@ -91,5 +91,25 @@ jobs:
               });
             }
 
+      - name: Add HIGH Risk Label
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const data = JSON.parse(fs.readFileSync('semgrep.json', 'utf8'));
+
+            const hasHigh = data.results.some(r => r.extra?.severity === "WARNING");
+            const hasCritical = data.results.some(r => r.extra?.severity === "ERROR");
+
+            if (hasHigh && !hasCritical) {
+              await github.rest.issues.addLabels({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ["security-review-required"]
+              });
+            }
+
       - name: Enforce Risk Policy
         run: python enforce_policy.py semgrep.json
