@@ -20,11 +20,14 @@ def enforce_semgrep_policy(results):
         title = finding.get("check_id")
 
         if risk == "CRITICAL":
-            print(f"🚫 CRITICAL: {title}")
+            print(f"🚫 CRITICAL FOUND: {title}")
             blocked = True
 
         elif risk == "HIGH":
-            print(f"⚠ HIGH: {title}")
+            print(f"⚠ HIGH FOUND: {title}")
+
+        elif risk == "LOW":
+            print(f"🟢 LOW: {title}")
 
     return not blocked
 
@@ -45,5 +48,5 @@ if __name__ == "__main__":
         print("\n❌ Merge blocked due to CRITICAL vulnerabilities.")
         sys.exit(1)
     else:
-        print("\n✅ Security check passed.")
+        print("\n✅ Security policy passed.")
         sys.exit(0)
