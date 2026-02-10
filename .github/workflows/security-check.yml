@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 🔥 IMPORTANT: Checkout the PR code, not develop branch
+      # 🔥 Checkout PR branch safely
       - name: Checkout PR code
         uses: actions/checkout@v4
         with:
@@ -39,6 +39,7 @@ jobs:
           name: semgrep-report
           path: semgrep.json
 
+      # 🔥 Professional PR Comment (no duplicate spam)
       - name: Comment PR with findings
         uses: actions/github-script@v7
         with:
@@ -47,23 +48,40 @@ jobs:
             const fs = require('fs');
             const data = JSON.parse(fs.readFileSync('semgrep.json', 'utf8'));
 
-            let comment = "## 🚨 Security Scan Results\n\n";
+            let critical = 0;
+            let high = 0;
+            let other = 0;
+
+            let body = "## 🔒 Security Scan Report\n\n";
 
             if (!data.results || data.results.length === 0) {
-              comment += "✅ No security issues found.\n";
+              body += "✅ No security issues found.\n";
             } else {
+
               data.results.forEach(r => {
                 const severity = r.extra?.severity || "INFO";
                 const rule = r.check_id;
                 const file = r.path;
                 const line = r.start?.line;
 
-                comment += `- **${severity}**: ${rule}\n`;
-                comment += `  📄 ${file}:${line}\n\n`;
+                if (severity === "ERROR") critical++;
+                else if (severity === "WARNING") high++;
+                else other++;
+
+                body += `- **${severity}**: ${rule}\n`;
+                body += `  📄 ${file}:${line}\n\n`;
               });
+
+              body =
+                "## 🔒 Security Scan Summary\n\n" +
+                `- 🔴 Critical: ${critical}\n` +
+                `- 🟠 High: ${high}\n` +
+                `- 🟢 Other: ${other}\n\n` +
+                "---\n\n" +
+                body;
             }
 
-            // Remove previous comment from bot (avoid duplicates)
+            // Update existing bot comment if exists
             const comments = await github.rest.issues.listComments({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -72,7 +90,7 @@ jobs:
 
             const existing = comments.data.find(c =>
               c.user.type === "Bot" &&
-              c.body.includes("🚨 Security Scan Results")
+              c.body.includes("🔒 Security Scan Summary")
             );
 
             if (existing) {
@@ -80,14 +98,14 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 comment_id: existing.id,
-                body: comment,
+                body: body,
               });
             } else {
               await github.rest.issues.createComment({
                 issue_number: context.issue.number,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                body: comment,
+                body: body,
               });
             }
 
